@@ -73,3 +73,13 @@ yarn-error.log
 !.yarn/releases
 !.yarn/sdks
 !.yarn/versions
+
+
+# Debug logs
+out*.txt
+
+# Large/local files
+docs/*.apk
+*.apk
+push_error.txt
+allfiles.txt
