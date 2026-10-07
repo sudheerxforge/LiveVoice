@@ -19,3 +19,20 @@ buildscript {
 }
 
 apply plugin: "com.facebook.react.rootproject"
+
+// Windows only: react-native-audio-api compiles C++ whose intermediate file
+// paths exceed Windows' 260-character limit (the `ninja` build tool is not
+// long-path aware), which breaks release builds. Putting its native build
+// files in a short folder keeps the paths within the limit.
+if (System.getProperty("os.name").toLowerCase().contains("windows")) {
+    subprojects { subproject ->
+        if (subproject.name == "react-native-audio-api") {
+            subproject.afterEvaluate {
+                if (subproject.extensions.findByName("android")) {
+                    subproject.android.externalNativeBuild.cmake.buildStagingDirectory =
+                        new File("C:/rn-audio-api-build")
+                }
+            }
+        }
+    }
+}
