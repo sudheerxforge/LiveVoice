@@ -11,6 +11,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { theme } from '../theme';
 
 const PANEL_WIDTH = Math.min(340, Dimensions.get('window').width * 0.85);
 
@@ -156,14 +157,14 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   chatRowActive: {
-    backgroundColor: '#1E3A8A',
+    backgroundColor: '#2B2F6B',
   },
   chatTitle: {
-    color: '#F8FAFC',
+    color: theme.text,
     fontSize: 15,
   },
   chatSubtitle: {
-    color: '#94A3B8',
+    color: theme.mute,
     fontSize: 12,
     marginTop: 2,
   },
@@ -182,9 +183,9 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     width: PANEL_WIDTH,
-    backgroundColor: '#0F172A',
+    backgroundColor: theme.bg,
     borderRightWidth: 1,
-    borderRightColor: '#1E293B',
+    borderRightColor: theme.card,
   },
   header: {
     flexDirection: 'row',
@@ -194,12 +195,12 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   title: {
-    color: '#F8FAFC',
+    color: theme.text,
     fontSize: 22,
     fontWeight: '700',
   },
   close: {
-    color: '#94A3B8',
+    color: theme.mute,
     fontSize: 20,
   },
   content: {
@@ -210,7 +211,7 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   sectionTitle: {
-    color: '#64748B',
+    color: theme.dim,
     fontSize: 12,
     fontWeight: '600',
     letterSpacing: 0.8,
@@ -220,7 +221,7 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1E293B',
+    backgroundColor: theme.card,
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 12,
@@ -233,20 +234,20 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   rowLabel: {
-    color: '#94A3B8',
+    color: theme.mute,
     fontSize: 12,
   },
   rowValue: {
-    color: '#F8FAFC',
+    color: theme.text,
     fontSize: 16,
     marginTop: 2,
   },
   danger: {
-    color: '#F87171',
+    color: theme.danger,
     fontSize: 15,
   },
   chevron: {
-    color: '#64748B',
+    color: theme.dim,
     fontSize: 24,
     marginLeft: 8,
   },

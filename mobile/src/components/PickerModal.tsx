@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { theme } from '../theme';
 
 export interface PickerItem {
   key: string;
@@ -75,7 +76,7 @@ const PickerModal: FC<Props> = ({
           <TextInput
             style={styles.search}
             placeholder="Search"
-            placeholderTextColor="#64748B"
+            placeholderTextColor={theme.dim}
             value={query}
             onChangeText={setQuery}
             autoCorrect={false}
@@ -125,7 +126,7 @@ const styles = StyleSheet.create({
   },
   sheet: {
     maxHeight: '80%',
-    backgroundColor: '#0F172A',
+    backgroundColor: theme.bg,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     paddingHorizontal: 16,
@@ -139,17 +140,17 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   title: {
-    color: '#F8FAFC',
+    color: theme.text,
     fontSize: 20,
     fontWeight: '600',
   },
   closeText: {
-    color: '#60A5FA',
+    color: theme.blue,
     fontSize: 16,
   },
   search: {
-    backgroundColor: '#1E293B',
-    color: '#F8FAFC',
+    backgroundColor: theme.card,
+    color: theme.text,
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 10,
@@ -164,27 +165,27 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   rowSelected: {
-    backgroundColor: '#1E3A8A',
+    backgroundColor: '#2B2F6B',
   },
   rowText: {
     flex: 1,
   },
   rowTitle: {
-    color: '#F8FAFC',
+    color: theme.text,
     fontSize: 16,
   },
   rowSubtitle: {
-    color: '#94A3B8',
+    color: theme.mute,
     fontSize: 13,
     marginTop: 2,
   },
   check: {
-    color: '#60A5FA',
+    color: theme.blue,
     fontSize: 18,
     marginLeft: 8,
   },
   empty: {
-    color: '#94A3B8',
+    color: theme.mute,
     textAlign: 'center',
     paddingVertical: 24,
   },

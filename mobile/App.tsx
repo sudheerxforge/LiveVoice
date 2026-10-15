@@ -1,6 +1,7 @@
 import React, { FC, useCallback, useEffect, useRef, useState } from 'react';
 import {
   Alert,
+  Animated,
   FlatList,
   Platform,
   StatusBar,
@@ -20,6 +21,10 @@ import {
   AudioRecorder,
 } from 'react-native-audio-api';
 import { fetchLiveToken, liveSocketUrl } from './src/api/liveToken';
+import AmbientBackground from './src/components/AmbientBackground';
+import VoiceOrb, { OrbMode } from './src/components/VoiceOrb';
+import Welcome, { MoodChip } from './src/components/Welcome';
+import { theme } from './src/theme';
 import ChatBubble from './src/components/ChatBubble';
 import PickerModal from './src/components/PickerModal';
 import SideMenu, {
@@ -58,13 +63,13 @@ interface ModelOption {
 const MODELS: ModelOption[] = [
   {
     id: 'models/gemini-3.8-live',
-    name: 'Gemini 3.8 Live',
+    name: 'LiveVoice',
     description: 'Fast, natural replies. Best for everyday conversation.',
     thinking: false,
   },
   {
     id: 'models/gemini-3.8-live-extended-thinking',
-    name: 'Gemini 3.8 Live Extended Thinking',
+    name: 'LiveVoice Extended Thinking',
     description:
       'Says a short filler, reasons in the background, then answers. ' +
       'For complex, multi-step questions; slower.',
@@ -157,6 +162,15 @@ const INPUT_CHUNK_FRAMES = 1024;
 // false if you use headphones and want to be able to talk over the model.
 const MUTE_MIC_WHILE_MODEL_SPEAKS = Platform.OS === 'android';
 const MIC_GATE_TAIL_MS = 300;
+
+// Friendlier text for the status line under the orb.
+const STATUS_LABEL: Record<string, string> = {
+  Disconnected: 'Ready when you are',
+  'Connecting...': 'Getting ready…',
+  Listening: "I'm listening…",
+  Speaking: 'Speaking…',
+  'Thinking...': 'Thinking…',
+};
 
 // --- Types ---
 
@@ -333,6 +347,8 @@ const VoiceScreen: FC = () => {
   // Ids of the chat messages being filled in by the current turn's
   // transcription; cleared when the turn completes or is interrupted.
   const currentUserMsg = useRef<string | null>(null);
+  // Set when a session is started from a mood chip: what the user opens with.
+  const openerRef = useRef<string | null>(null);
   const currentModelMsg = useRef<string | null>(null);
   const chatList = useRef<FlatList<ChatMessage>>(null);
 
@@ -520,6 +536,31 @@ const VoiceScreen: FC = () => {
   const isActive = status !== 'Disconnected' && status !== 'Error' &&
     status !== 'Microphone permission denied';
 
+  // Gentle pulse on the Start button while idle, to invite a tap.
+  const buttonPulse = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (isActive) {
+      buttonPulse.setValue(0);
+      return;
+    }
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(buttonPulse, {
+          toValue: 1,
+          duration: 1400,
+          useNativeDriver: true,
+        }),
+        Animated.timing(buttonPulse, {
+          toValue: 0,
+          duration: 1400,
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [isActive, buttonPulse]);
+
   const stopSession = useCallback((finalStatus: Status = 'Disconnected') => {
     const socket = ws.current;
     ws.current = null;
@@ -654,6 +695,20 @@ const VoiceScreen: FC = () => {
       if (history.length) {
         ws.current?.send(
           JSON.stringify({ clientContent: { turns: history, turnComplete: false } }),
+        );
+      }
+      const opener = openerRef.current;
+      openerRef.current = null;
+      if (opener) {
+        appendTranscript('user', opener);
+        endTurn();
+        ws.current?.send(
+          JSON.stringify({
+            clientContent: {
+              turns: [{ role: 'user', parts: [{ text: opener }] }],
+              turnComplete: true,
+            },
+          }),
         );
       }
       setStatus('Listening');
@@ -810,8 +865,23 @@ const VoiceScreen: FC = () => {
     };
   };
 
+  const startFromMood = (mood: MoodChip) => {
+    openerRef.current = mood.opener;
+    startSession();
+  };
+
+  const orbMode: OrbMode =
+    status === 'Listening'
+      ? 'listening'
+      : status === 'Speaking'
+      ? 'speaking'
+      : status === 'Thinking...' || status === 'Connecting...'
+      ? 'thinking'
+      : 'idle';
+
   return (
     <SafeAreaView style={styles.container}>
+      <AmbientBackground />
       <StatusBar barStyle="light-content" />
       <View style={styles.header}>
         <TouchableOpacity
@@ -824,7 +894,7 @@ const VoiceScreen: FC = () => {
           <View style={styles.menuLine} />
         </TouchableOpacity>
         <Text style={styles.title} numberOfLines={1}>
-          {chats.find(c => c.id === activeChatId)?.title ?? 'New chat'}
+          {chats.find(c => c.id === activeChatId)?.title ?? 'LiveVoice'}
         </Text>
         <TouchableOpacity
           onPress={startNewChat}
@@ -846,23 +916,52 @@ const VoiceScreen: FC = () => {
         renderItem={({ item }) => <ChatBubble message={item} />}
         onContentSizeChange={() => chatList.current?.scrollToEnd()}
         ListEmptyComponent={
-          <Text style={styles.emptyText}>
-            New chat{'\n'}Tap “Start Talking” and say hello.
-          </Text>
+          <View style={styles.hero}>
+            <VoiceOrb mode={orbMode} size={150} />
+            <Welcome onPick={startFromMood} disabled={isActive} />
+          </View>
         }
       />
 
-      <Text style={styles.statusText}>{status}</Text>
+      {messages.length > 0 && (
+        <View style={styles.orbArea}>
+          <VoiceOrb mode={orbMode} size={64} />
+        </View>
+      )}
+
+      <Text style={styles.statusText}>{STATUS_LABEL[status] ?? status}</Text>
       {error && <Text style={styles.errorText}>{error}</Text>}
 
-      <TouchableOpacity
-        style={[styles.button, isActive ? styles.stopBtn : styles.startBtn]}
-        onPress={isActive ? () => stopSession() : startSession}
-        activeOpacity={0.8}>
-        <Text style={styles.buttonText}>
-          {isActive ? 'End Conversation' : 'Start Talking'}
-        </Text>
-      </TouchableOpacity>
+      <Animated.View
+        style={{
+          alignSelf: 'stretch',
+          transform: [
+            {
+              scale: isActive
+                ? 1
+                : buttonPulse.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [1, 1.05],
+                  }),
+            },
+          ],
+        }}>
+        <TouchableOpacity
+          style={[styles.button, isActive ? styles.stopBtn : styles.startBtn]}
+          onPress={
+            isActive
+              ? () => stopSession()
+              : () => {
+                  openerRef.current = null;
+                  startSession();
+                }
+          }
+          activeOpacity={0.8}>
+          <Text style={styles.buttonText}>
+            {isActive ? 'End Conversation' : '🎙️  Start Talking'}
+          </Text>
+        </TouchableOpacity>
+      </Animated.View>
 
       <SideMenu visible={menuOpen} onClose={() => setMenuOpen(false)}>
         <MenuRow label="＋  New chat" onPress={startNewChat} />
@@ -888,7 +987,6 @@ const VoiceScreen: FC = () => {
 
         <View style={styles.modelCard}>
           <Text style={styles.modelName}>{model.name}</Text>
-          <Text style={styles.modelId}>{model.id.replace('models/', '')}</Text>
           <Text style={styles.modelMeta}>
             Speaks {LANGUAGES.length} languages · detects yours automatically
           </Text>
@@ -1034,7 +1132,7 @@ export default App;
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0F172A',
+    backgroundColor: theme.bg,
     alignItems: 'center',
     paddingHorizontal: 16,
   },
@@ -1053,23 +1151,25 @@ const styles = StyleSheet.create({
   menuLine: {
     height: 2.5,
     borderRadius: 2,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: theme.text,
   },
   title: {
     flex: 1,
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#F8FAFC',
+    color: theme.text,
   },
   newChatButton: {
-    backgroundColor: '#1E293B',
+    backgroundColor: theme.card,
+    borderWidth: 1,
+    borderColor: theme.line,
     borderRadius: 16,
     paddingHorizontal: 12,
     paddingVertical: 6,
     marginLeft: 12,
   },
   newChatText: {
-    color: '#F8FAFC',
+    color: theme.text,
     fontSize: 14,
     fontWeight: '600',
   },
@@ -1085,64 +1185,73 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   emptyText: {
-    color: '#64748B',
+    color: theme.dim,
     fontSize: 15,
     lineHeight: 22,
     textAlign: 'center',
   },
+  hero: {
+    alignItems: 'center',
+    paddingTop: 36,
+    paddingBottom: 16,
+  },
+  orbArea: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: 14,
+    paddingBottom: 6,
+  },
   statusText: {
     fontSize: 14,
-    color: '#94A3B8',
+    color: theme.mute,
     marginTop: 8,
     marginBottom: 4,
   },
   errorText: {
     fontSize: 14,
-    color: '#F87171',
+    color: theme.danger,
     textAlign: 'center',
     marginBottom: 4,
   },
   modelCard: {
-    backgroundColor: '#1E293B',
+    backgroundColor: theme.card,
+    borderWidth: 1,
+    borderColor: theme.line,
     borderRadius: 12,
     padding: 14,
     marginTop: 16,
   },
   modelName: {
-    color: '#F8FAFC',
+    color: theme.text,
     fontSize: 18,
     fontWeight: '600',
   },
-  modelId: {
-    color: '#94A3B8',
-    fontSize: 13,
-    marginTop: 2,
-  },
   modelMeta: {
-    color: '#93C5FD',
+    color: theme.blue,
     fontSize: 14,
     marginTop: 6,
   },
   hint: {
-    color: '#94A3B8',
+    color: theme.mute,
     fontSize: 12,
     marginBottom: 8,
   },
   button: {
-    width: 220,
-    height: 56,
-    borderRadius: 28,
+    width: '100%',
+    height: 60,
+    borderRadius: 30,
     alignItems: 'center',
     justifyContent: 'center',
-    elevation: 3,
+    elevation: 10,
+    shadowColor: theme.violet,
     marginTop: 8,
     marginBottom: 16,
   },
   startBtn: {
-    backgroundColor: '#2563EB',
+    backgroundColor: theme.violet,
   },
   stopBtn: {
-    backgroundColor: '#DC2626',
+    backgroundColor: '#E5484D',
   },
   buttonText: {
     color: '#FFFFFF',
